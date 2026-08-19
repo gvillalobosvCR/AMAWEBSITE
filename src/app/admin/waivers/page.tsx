@@ -10,7 +10,10 @@ interface PageProps {
     lang?: string
     ageGroup?: string
     tablet?: string
-    date?: string
+    startDate?: string
+    endDate?: string
+    agency?: string
+    page?: string
   }>
 }
 
@@ -23,7 +26,15 @@ export default async function WaiversPage({ searchParams }: PageProps) {
   const lang = params.lang || ''
   const ageGroup = params.ageGroup || ''
   const tablet = params.tablet || ''
-  const date = params.date || ''
+  const startDate = params.startDate || ''
+  const endDate = params.endDate || ''
+  const agency = params.agency || ''
+  const pageStr = params.page || '1'
+  const page = parseInt(pageStr, 10) || 1
+  const pageSize = 20
+
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
 
   // Begin build query
   let query = supabase
@@ -31,7 +42,8 @@ export default async function WaiversPage({ searchParams }: PageProps) {
     .select(`
       *,
       profiles (full_name),
-      guardian_information (*)
+      guardian_information (*),
+      agencies (name)
     `, { count: 'exact' })
     .order('created_at', { ascending: false })
 
@@ -57,17 +69,24 @@ export default async function WaiversPage({ searchParams }: PageProps) {
     query = query.eq('tablet_user_id', tablet)
   }
 
-  if (date) {
-    // Match date string (YYYY-MM-DD) inside Costa Rica timezone
-    // The DB stores UTC. Costa Rica offset is UTC-6.
-    const startUTC = new Date(date + 'T00:00:00')
-    startUTC.setHours(startUTC.getHours() + 6) // Shift 6 hours to UTC
-    
-    const endUTC = new Date(date + 'T23:59:59')
-    endUTC.setHours(endUTC.getHours() + 6)
-
-    query = query.gte('created_at', startUTC.toISOString()).lte('created_at', endUTC.toISOString())
+  if (agency) {
+    query = query.eq('agency_id', agency)
   }
+
+  if (startDate) {
+    const startUTC = new Date(startDate + 'T00:00:00')
+    startUTC.setHours(startUTC.getHours() + 6) // Shift 6 hours to UTC (Costa Rica offset is UTC-6)
+    query = query.gte('created_at', startUTC.toISOString())
+  }
+
+  if (endDate) {
+    const endUTC = new Date(endDate + 'T23:59:59')
+    endUTC.setHours(endUTC.getHours() + 6)
+    query = query.lte('created_at', endUTC.toISOString())
+  }
+
+  // Apply pagination range limit
+  query = query.range(from, to)
 
   const { data: waivers, count } = await query
 
@@ -77,12 +96,21 @@ export default async function WaiversPage({ searchParams }: PageProps) {
     .select('id, full_name')
     .order('full_name')
 
+  // Retrieve agencies for filter select
+  const { data: agencies } = await supabase
+    .from('agencies')
+    .select('id, name')
+    .order('name')
+
   return (
     <WaiversClient
       waivers={waivers || []}
       totalCount={count || 0}
       profiles={profiles || []}
-      currentFilters={{ search, lang, ageGroup, tablet, date }}
+      agencies={agencies || []}
+      currentPage={page}
+      pageSize={pageSize}
+      currentFilters={{ search, lang, ageGroup, tablet, startDate, endDate, agency }}
     />
   )
 }

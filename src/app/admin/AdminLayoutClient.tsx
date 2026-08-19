@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   UserCheck,
+  Building2,
 } from 'lucide-react'
 
 interface AdminLayoutClientProps {
@@ -34,6 +35,7 @@ export default function AdminLayoutClient({ userProfile, children }: AdminLayout
     { name: 'Waivers / Descargos', path: '/admin/waivers', icon: FileText },
     { name: 'Usuarios', path: '/admin/users', icon: Users },
     { name: 'Texto del Waiver', path: '/admin/versions', icon: BookOpen },
+    { name: 'Agencias', path: '/admin/agencies', icon: Building2 },
     { name: 'Configuración', path: '/admin/settings', icon: Settings },
   ]
 

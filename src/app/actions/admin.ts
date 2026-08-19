@@ -145,3 +145,36 @@ export async function resetUserPassword(userId: string, password: string) {
     return { error: err.message || 'Server error resetting password' }
   }
 }
+
+// Agency Management Actions
+export async function createAgency(name: string) {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('agencies')
+    .insert({ name })
+
+  if (error) {
+    return { error: 'Error al crear agencia / Error creating agency: ' + error.message }
+  }
+
+  revalidatePath('/admin/agencies')
+  revalidatePath('/kiosk')
+  return { success: true }
+}
+
+export async function deleteAgency(id: string) {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('agencies')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    return { error: 'Error al eliminar agencia / Error deleting agency: ' + error.message }
+  }
+
+  revalidatePath('/admin/agencies')
+  revalidatePath('/kiosk')
+  return { success: true }
+}
+

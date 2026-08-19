@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf'
+import { formatDateTimeUTC } from './date-utils'
 
 interface PDFData {
   waiverNumber: string
@@ -63,52 +64,49 @@ export async function generateWaiverPDF(data: PDFData) {
   doc.setFont('Helvetica', 'bold')
   doc.setFontSize(14)
   doc.setTextColor(30, 41, 59) // Slate-800
-  const title = data.language === 'es' 
-    ? 'Formulario de Descargo de Responsabilidad Digital'
-    : 'Digital Liability Waiver and Release Form'
+  const title = 'Formulario de Descargo de Responsabilidad / Liability Waiver'
   doc.text(title, margin, currentY)
 
   // 2. METADATA SECTION
   currentY += 8
   doc.setFont('Helvetica', 'normal')
-  doc.setFontSize(10)
+  doc.setFontSize(9.5) // slightly smaller font for long labels
   doc.setTextColor(71, 85, 105) // Slate-600
 
-  const dateObj = new Date(data.createdAt)
-  const dateStr = dateObj.toLocaleDateString('es-CR') + ' ' + dateObj.toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit' })
+  const dateStr = formatDateTimeUTC(data.createdAt)
 
   // Print left column details
   doc.setFont('Helvetica', 'bold')
-  doc.text(data.language === 'es' ? 'Código de Waiver:' : 'Waiver Code:', margin, currentY)
+  doc.text('Código / Waiver Code:', margin, currentY)
   doc.setFont('Helvetica', 'normal')
-  doc.text(data.waiverNumber, margin + 40, currentY)
+  doc.text(data.waiverNumber, margin + 45, currentY)
 
   doc.setFont('Helvetica', 'bold')
-  doc.text(data.language === 'es' ? 'Fecha y Hora:' : 'Date & Time:', margin + 100, currentY)
+  doc.text('Fecha / Date & Time:', margin + 100, currentY)
   doc.setFont('Helvetica', 'normal')
-  doc.text(dateStr, margin + 130, currentY)
-
-  currentY += 6
-  doc.setFont('Helvetica', 'bold')
-  doc.text(data.language === 'es' ? 'Nombre Completo:' : 'Full Name:', margin, currentY)
-  doc.setFont('Helvetica', 'normal')
-  doc.text(data.fullName, margin + 40, currentY)
-
-  doc.setFont('Helvetica', 'bold')
-  doc.text(data.language === 'es' ? 'Versión Texto:' : 'Waiver Version:', margin + 100, currentY)
-  doc.setFont('Helvetica', 'normal')
-  doc.text(data.version, margin + 130, currentY)
+  doc.text(dateStr, margin + 135, currentY)
 
   currentY += 6
   doc.setFont('Helvetica', 'bold')
-  doc.text(data.language === 'es' ? 'ID / Pasaporte:' : 'ID / Passport:', margin, currentY)
+  doc.text('Nombre / Full Name:', margin, currentY)
   doc.setFont('Helvetica', 'normal')
-  doc.text(data.idPassport, margin + 40, currentY)
+  doc.text(data.fullName, margin + 45, currentY)
 
   doc.setFont('Helvetica', 'bold')
-  doc.text(data.language === 'es' ? 'Edad:' : 'Age:', margin + 100, currentY)
+  doc.text('Versión / Version:', margin + 100, currentY)
   doc.setFont('Helvetica', 'normal')
-  doc.text(`${data.age} ${data.language === 'es' ? 'años' : 'years old'}`, margin + 130, currentY)
+  doc.text(data.version, margin + 135, currentY)
+
+  currentY += 6
+  doc.setFont('Helvetica', 'bold')
+  doc.text('Identificación / ID:', margin, currentY)
+  doc.setFont('Helvetica', 'normal')
+  doc.text(data.idPassport, margin + 45, currentY)
+
+  doc.setFont('Helvetica', 'bold')
+  doc.text('Edad / Age:', margin + 100, currentY)
+  doc.setFont('Helvetica', 'normal')
+  doc.text(`${data.age} años / years old`, margin + 135, currentY)
 
   // 3. CONDITIONAL GUARDIAN METADATA
   if (data.isMinor) {
@@ -120,25 +118,25 @@ export async function generateWaiverPDF(data: PDFData) {
 
     doc.setFont('Helvetica', 'bold')
     doc.setTextColor(30, 41, 59)
-    doc.text(data.language === 'es' ? 'INFORMACIÓN DEL RESPONSABLE (MENOR DE EDAD)' : 'RESPONSIBLE ADULT / LEGAL GUARDIAN', margin, currentY)
+    doc.text('TUTOR RESPONSABLE / LEGAL GUARDIAN (MENOR DE EDAD / MINOR)', margin, currentY)
     
     currentY += 6
-    doc.setFontSize(9)
+    doc.setFontSize(8.5)
     doc.setFont('Helvetica', 'bold')
-    doc.text(data.language === 'es' ? 'Nombre Tutor:' : 'Guardian Name:', margin, currentY)
+    doc.text('Nombre / Guardian Name:', margin, currentY)
     doc.setFont('Helvetica', 'normal')
-    doc.text(data.guardianName || '', margin + 30, currentY)
+    doc.text(data.guardianName || '', margin + 45, currentY)
 
     doc.setFont('Helvetica', 'bold')
-    doc.text(data.language === 'es' ? 'Pasaporte/ID:' : 'Guardian ID:', margin + 100, currentY)
+    doc.text('ID / Passport:', margin + 100, currentY)
     doc.setFont('Helvetica', 'normal')
     doc.text(data.guardianIdPassport || '', margin + 125, currentY)
 
     currentY += 5
     doc.setFont('Helvetica', 'bold')
-    doc.text(data.language === 'es' ? 'Relación:' : 'Relationship:', margin, currentY)
+    doc.text('Relación / Relationship:', margin, currentY)
     doc.setFont('Helvetica', 'normal')
-    doc.text(data.relationship || '', margin + 30, currentY)
+    doc.text(data.relationship || '', margin + 45, currentY)
     
     currentY += 5
     doc.setFontSize(10)
@@ -153,7 +151,7 @@ export async function generateWaiverPDF(data: PDFData) {
   currentY += 8
   doc.setFont('Helvetica', 'bold')
   doc.setTextColor(30, 41, 59)
-  doc.text(data.language === 'es' ? 'Términos Aceptados:' : 'Accepted Terms:', margin, currentY)
+  doc.text('Términos Aceptados / Accepted Terms:', margin, currentY)
 
   currentY += 6
   doc.setFont('Helvetica', 'normal')
@@ -191,7 +189,7 @@ export async function generateWaiverPDF(data: PDFData) {
   doc.setFont('Helvetica', 'bold')
   doc.setFontSize(10)
   doc.setTextColor(30, 41, 59)
-  doc.text(data.language === 'es' ? 'Firmas autorizadas:' : 'Authorized Signatures:', margin, currentY)
+  doc.text('Firmas Autorizadas / Authorized Signatures:', margin, currentY)
 
   currentY += 5
   try {
@@ -203,7 +201,7 @@ export async function generateWaiverPDF(data: PDFData) {
     doc.setFont('Helvetica', 'normal')
     doc.setTextColor(148, 163, 184) // Slate-400
     doc.text('__________________________________', margin, currentY + 23)
-    doc.text(data.language === 'es' ? 'Firma del Participante' : 'Participant Signature', margin, currentY + 27)
+    doc.text('Firma del Participante / Participant Signature', margin, currentY + 27)
 
     // Render Guardian Signature if minor
     if (data.isMinor && data.guardianSignatureUrl) {
@@ -211,7 +209,7 @@ export async function generateWaiverPDF(data: PDFData) {
       doc.addImage(guardSigBase64, 'PNG', margin + 90, currentY, 50, 20)
 
       doc.text('__________________________________', margin + 90, currentY + 23)
-      doc.text(data.language === 'es' ? 'Firma del Tutor Responsable' : 'Legal Guardian Signature', margin + 90, currentY + 27)
+      doc.text('Firma del Tutor / Legal Guardian Signature', margin + 90, currentY + 27)
     }
   } catch (imgError) {
     console.error('Failed to load signature images for PDF generation:', imgError)

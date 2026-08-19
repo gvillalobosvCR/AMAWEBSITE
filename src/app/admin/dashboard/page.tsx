@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { FileText, Users, Baby, CalendarClock, ChevronRight, User } from 'lucide-react'
 import Link from 'next/link'
+import { formatDateTimeUTC } from '@/lib/date-utils'
 
 export const revalidate = 0
 export const dynamic = 'force-dynamic'
@@ -165,9 +166,9 @@ export default async function DashboardPage() {
                             {w.language}
                           </span>
                         </td>
-                        <td className="py-4">
-                          {date.toLocaleDateString('es-CR')} {date.toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit' })}
-                        </td>
+                         <td className="py-4">
+                           {formatDateTimeUTC(w.created_at)}
+                         </td>
                       </tr>
                     )
                   })

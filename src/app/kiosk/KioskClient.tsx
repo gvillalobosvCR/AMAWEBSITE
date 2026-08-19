@@ -18,6 +18,8 @@ interface KioskClientProps {
   minAge: number
   inactivityTimeout: number
   confirmationTimeout: number
+  kioskPin: string
+  agencies: { id: string; name: string }[]
 }
 
 export default function KioskClient({
@@ -25,15 +27,24 @@ export default function KioskClient({
   minAge,
   inactivityTimeout,
   confirmationTimeout,
+  kioskPin,
+  agencies,
 }: KioskClientProps) {
-  // Page states: 'language' | 'details' | 'sign' | 'success'
-  const [step, setStep] = useState<'language' | 'details' | 'sign' | 'success'>('language')
-  const [lang, setLang] = useState<'es' | 'en' | null>(null)
+  // Page states: 'details' | 'sign' | 'success'
+  const [step, setStep] = useState<'details' | 'sign' | 'success'>('details')
+  const lang = 'es' // Default language for DB consistency, interface is bilingual
 
   // Customer info states
   const [fullName, setFullName] = useState('')
   const [idPassport, setIdPassport] = useState('')
   const [age, setAge] = useState('')
+
+  // Agency States
+  const [selectedAgencyId, setSelectedAgencyId] = useState<string>('')
+  const [isAgencyUnlocked, setIsAgencyUnlocked] = useState(false)
+  const [showPinModal, setShowPinModal] = useState(false)
+  const [enteredPin, setEnteredPin] = useState('')
+  const [pinError, setPinError] = useState(false)
 
   // Guardian info states (conditional)
   const [guardianName, setGuardianName] = useState('')
@@ -63,11 +74,12 @@ export default function KioskClient({
     setGuardianSignature('')
     setAgreed(false)
     setSignature('')
-    setLang(null)
-    setStep('language')
+    setStep('details')
     setSubmitting(false)
     setError(null)
     setWaiverNumber(null)
+    setSelectedAgencyId('')
+    setIsAgencyUnlocked(false)
   }
 
   // Handle auto redirection on success
@@ -84,21 +96,19 @@ export default function KioskClient({
     if (step === 'details') {
       // Validate inputs
       if (!fullName.trim() || !idPassport.trim() || !age) {
-        setError(lang === 'es' ? 'Por favor complete todos los campos.' : 'Please fill in all fields.')
+        setError('Por favor complete todos los campos. / Please fill in all fields.')
         return
       }
       const parsedAge = parseInt(age, 10)
       if (isNaN(parsedAge) || parsedAge <= 0) {
-        setError(lang === 'es' ? 'Ingrese una edad válida.' : 'Please enter a valid age.')
+        setError('Ingrese una edad válida. / Please enter a valid age.')
         return
       }
 
       if (isMinor) {
         if (!guardianName.trim() || !guardianId.trim() || !relationship.trim()) {
           setError(
-            lang === 'es'
-              ? 'Por favor complete los datos del tutor responsable.'
-              : 'Please fill in the legal guardian details.'
+            'Por favor complete los datos del tutor responsable. / Please fill in the legal guardian details.'
           )
           return
         }
@@ -108,30 +118,34 @@ export default function KioskClient({
     }
   }
 
+  const handleVerifyPin = () => {
+    if (enteredPin === kioskPin) {
+      setIsAgencyUnlocked(true)
+      setShowPinModal(false)
+      setPinError(false)
+    } else {
+      setPinError(true)
+    }
+  }
+
   const handleSubmit = async () => {
     if (!agreed) {
       setError(
-        lang === 'es'
-          ? 'Debe aceptar los términos para continuar.'
-          : 'You must agree to the terms to proceed.'
+        'Debe aceptar los términos para continuar. / You must agree to the terms to proceed.'
       )
       return
     }
 
     if (!signature) {
       setError(
-        lang === 'es'
-          ? 'Debe firmar el descargo de responsabilidad.'
-          : 'You must sign the waiver form.'
+        'Debe firmar el descargo de responsabilidad. / You must sign the waiver form.'
       )
       return
     }
 
     if (isMinor && !guardianSignature) {
       setError(
-        lang === 'es'
-          ? 'El tutor legal debe firmar el descargo.'
-          : 'The legal guardian must sign the waiver.'
+        'El tutor legal debe firmar el descargo. / The legal guardian must sign the waiver.'
       )
       return
     }
@@ -146,8 +160,9 @@ export default function KioskClient({
       language: lang!,
       signatureBase64: signature,
       versionId: activeVersion.id,
-      exactContent: lang === 'es' ? activeVersion.content_es : activeVersion.content_en,
+      exactContent: `${activeVersion.title_es} / ${activeVersion.title_en}\n\n${activeVersion.content_es}\n\n${activeVersion.content_en}`,
       isMinor,
+      agencyId: selectedAgencyId || undefined,
       guardianName: isMinor ? guardianName : undefined,
       guardianIdPassport: isMinor ? guardianId : undefined,
       relationship: isMinor ? relationship : undefined,
@@ -180,12 +195,12 @@ export default function KioskClient({
                 Mundo Aventura
               </span>
             </div>
-            {lang && step !== 'success' && (
+            {step !== 'success' && (
               <button
                 onClick={resetAllState}
                 className="px-4 py-2 border border-slate-200 hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
               >
-                {lang === 'es' ? 'Reiniciar' : 'Restart'}
+                Reiniciar / Restart
               </button>
             )}
           </div>
@@ -193,59 +208,13 @@ export default function KioskClient({
 
         {/* Form Body */}
         <main className="flex-1 max-w-4xl w-full mx-auto p-4 md:p-8 flex flex-col justify-center">
-          
-          {/* STEP 1: LANGUAGE SELECTION */}
-          {step === 'language' && (
-            <div className="text-center py-10 max-w-2xl mx-auto flex flex-col items-center">
-              <h2 className="text-2xl md:text-3xl font-bold text-slate-800 mb-2">
-                Bienvenido a Arenal Mundo Aventura
-              </h2>
-              <p className="text-slate-400 text-sm md:text-base mb-10 uppercase tracking-wider font-semibold">
-                Formulario de Descargo / Liability Waiver
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full px-4">
-                <button
-                  onClick={() => {
-                    setLang('es')
-                    setStep('details')
-                  }}
-                  className="py-8 bg-white border border-slate-200 hover:border-emerald-600 rounded-3xl shadow-md hover:shadow-xl transition-all cursor-pointer flex flex-col items-center justify-center gap-4 group active:scale-[0.98]"
-                >
-                  <span className="text-5xl group-hover:scale-110 transition-transform">🇨🇷</span>
-                  <span className="text-xl md:text-2xl font-black text-teal-800 uppercase tracking-wide">
-                    Español
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setLang('en')
-                    setStep('details')
-                  }}
-                  className="py-8 bg-white border border-slate-200 hover:border-emerald-600 rounded-3xl shadow-md hover:shadow-xl transition-all cursor-pointer flex flex-col items-center justify-center gap-4 group active:scale-[0.98]"
-                >
-                  <span className="text-5xl group-hover:scale-110 transition-transform">🇺🇸</span>
-                  <span className="text-xl md:text-2xl font-black text-teal-800 uppercase tracking-wide">
-                    English
-                  </span>
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* STEP 2: PERSONAL DETAILS */}
-          {step === 'details' && lang && (
+          {step === 'details' && (
             <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-6 md:p-10 animate-in fade-in slide-in-from-bottom-4 duration-300">
               <div className="flex items-center gap-2 mb-6">
-                <button
-                  onClick={() => setStep('language')}
-                  className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-500 cursor-pointer"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </button>
                 <h3 className="text-xl font-bold text-slate-800">
-                  {lang === 'es' ? 'Información del Participante' : 'Participant Details'}
+                  Información del Participante / Participant Details
                 </h3>
               </div>
 
@@ -257,36 +226,94 @@ export default function KioskClient({
               )}
 
               <div className="space-y-6">
+                
+                {/* Agency Selection Dropdown (AMA protected) */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 pb-6 border-b border-slate-100 mb-6">
+                  <div className="md:col-span-12 space-y-2">
+                    <label className="text-sm font-bold text-slate-600 block flex items-center justify-between">
+                      <span>Agencia / Agency</span>
+                      <span className="text-xs font-semibold text-slate-400 italic">
+                        Solo personal de AMA / AMA Staff Only
+                      </span>
+                    </label>
+                    
+                    <div className="relative flex items-center">
+                      <select
+                        disabled={!isAgencyUnlocked}
+                        value={selectedAgencyId}
+                        onChange={(e) => setSelectedAgencyId(e.target.value)}
+                        className={`w-full p-4 bg-slate-50 border rounded-2xl text-slate-800 placeholder-slate-400 outline-none transition-all text-base md:text-lg appearance-none ${
+                          isAgencyUnlocked 
+                            ? 'border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-100 cursor-pointer' 
+                            : 'border-slate-200 opacity-75 cursor-not-allowed bg-slate-100'
+                        }`}
+                      >
+                        <option value="">-- Seleccionar Agencia / Select Agency --</option>
+                        {agencies.map((agency) => (
+                          <option key={agency.id} value={agency.id}>
+                            {agency.name}
+                          </option>
+                        ))}
+                      </select>
+                      
+                      {/* Lock/Unlock Toggle Icon */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isAgencyUnlocked) {
+                            setIsAgencyUnlocked(false)
+                          } else {
+                            setEnteredPin('')
+                            setPinError(false)
+                            setShowPinModal(true)
+                          }
+                        }}
+                        className={`absolute right-4 p-2 rounded-xl transition-all cursor-pointer ${
+                          isAgencyUnlocked 
+                            ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' 
+                            : 'bg-teal-800 text-white hover:bg-teal-900'
+                        }`}
+                      >
+                        {isAgencyUnlocked ? (
+                          <span className="text-xs font-bold px-1.5 py-0.5 flex items-center gap-1">🔓 Desbloqueado / Unlocked</span>
+                        ) : (
+                          <span className="text-xs font-bold px-1.5 py-0.5 flex items-center gap-1">🔒 Bloqueado / Locked</span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
                   <div className="md:col-span-6 space-y-2">
                     <label className="text-sm font-bold text-slate-600 block">
-                      {lang === 'es' ? 'Nombre completo' : 'Full Name'} *
+                      Nombre completo / Full Name *
                     </label>
                     <input
                       type="text"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      placeholder={lang === 'es' ? 'Escriba su nombre completo' : 'Enter your full name'}
+                      placeholder="Escriba su nombre completo / Enter your full name"
                       className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 placeholder-slate-400 focus:bg-white focus:border-teal-600 focus:ring-4 focus:ring-teal-100 outline-none transition-all text-base md:text-lg"
                     />
                   </div>
 
                   <div className="md:col-span-4 space-y-2">
                     <label className="text-sm font-bold text-slate-600 block">
-                      {lang === 'es' ? 'Identificación / Pasaporte' : 'ID / Passport'} *
+                      Identificación / Pasaporte / ID / Passport *
                     </label>
                     <input
                       type="text"
                       value={idPassport}
                       onChange={(e) => setIdPassport(e.target.value)}
-                      placeholder={lang === 'es' ? 'Cédula o pasaporte' : 'Passport or ID number'}
+                      placeholder="Cédula o pasaporte / Passport or ID number"
                       className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 placeholder-slate-400 focus:bg-white focus:border-teal-600 focus:ring-4 focus:ring-teal-100 outline-none transition-all text-base md:text-lg"
                     />
                   </div>
 
                   <div className="md:col-span-2 space-y-2">
                     <label className="text-sm font-bold text-slate-600 block">
-                      {lang === 'es' ? 'Edad' : 'Age'} *
+                      Edad / Age *
                     </label>
                     <input
                       type="number"
@@ -303,55 +330,53 @@ export default function KioskClient({
                   <div className="mt-8 pt-8 border-t border-slate-100 space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
                     <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl text-amber-900 text-sm">
                       <span className="font-bold block mb-1">
-                        {lang === 'es' ? 'Aviso para menores de edad' : 'Guardian Required for Minors'}
+                        Aviso para menores de edad / Guardian Required for Minors
                       </span>
                       <span>
-                        {lang === 'es'
-                          ? 'Al ser menor de 18 años, un padre, madre o tutor legal debe llenar y firmar el descargo de responsabilidad.'
-                          : 'As the participant is under 18 years old, a parent or legal guardian must complete and sign this waiver.'}
+                        Al ser menor de 18 años, un padre, madre o tutor legal debe llenar y firmar el descargo de responsabilidad. / As the participant is under 18 years old, a parent or legal guardian must complete and sign this waiver.
                       </span>
                     </div>
 
                     <h4 className="text-lg font-bold text-slate-800">
-                      {lang === 'es' ? 'Tutor Responsable / Parent or Legal Guardian' : 'Legal Guardian Details'}
+                      Tutor Responsable / Parent or Legal Guardian
                     </h4>
 
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
                       <div className="md:col-span-5 space-y-2">
                         <label className="text-sm font-bold text-slate-600 block">
-                          {lang === 'es' ? 'Nombre completo del tutor' : 'Guardian Full Name'} *
+                          Nombre completo del tutor / Guardian Full Name *
                         </label>
                         <input
                           type="text"
                           value={guardianName}
                           onChange={(e) => setGuardianName(e.target.value)}
-                          placeholder={lang === 'es' ? 'Nombre completo del adulto' : 'Enter guardian name'}
+                          placeholder="Nombre completo del adulto / Enter guardian name"
                           className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 focus:bg-white focus:border-teal-600 outline-none transition-all"
                         />
                       </div>
 
                       <div className="md:col-span-4 space-y-2">
                         <label className="text-sm font-bold text-slate-600 block">
-                          {lang === 'es' ? 'Identificación / Pasaporte del tutor' : 'Guardian ID / Passport'} *
+                          Identificación / Pasaporte del tutor / Guardian ID / Passport *
                         </label>
                         <input
                           type="text"
                           value={guardianId}
                           onChange={(e) => setGuardianId(e.target.value)}
-                          placeholder={lang === 'es' ? 'Cédula o pasaporte del adulto' : 'Passport or ID number'}
+                          placeholder="Cédula o pasaporte del adulto / Passport or ID number"
                           className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 focus:bg-white focus:border-teal-600 outline-none transition-all"
                         />
                       </div>
 
                       <div className="md:col-span-3 space-y-2">
                         <label className="text-sm font-bold text-slate-600 block">
-                          {lang === 'es' ? 'Relación con el menor' : 'Relationship to minor'} *
+                          Relación con el menor / Relationship to minor *
                         </label>
                         <input
                           type="text"
                           value={relationship}
                           onChange={(e) => setRelationship(e.target.value)}
-                          placeholder={lang === 'es' ? 'e.g. Padre / Madre' : 'e.g. Mother / Father'}
+                          placeholder="e.g. Padre / Madre o Mother / Father"
                           className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 focus:bg-white focus:border-teal-600 outline-none transition-all"
                         />
                       </div>
@@ -364,7 +389,7 @@ export default function KioskClient({
                     onClick={handleNextStep}
                     className="px-8 py-4 bg-teal-800 hover:bg-teal-900 text-white font-bold text-lg rounded-2xl shadow-md cursor-pointer flex items-center gap-2 active:scale-98 transition-all"
                   >
-                    <span>{lang === 'es' ? 'Siguiente' : 'Next'}</span>
+                    <span>Siguiente / Next</span>
                     <ChevronRight className="w-5 h-5" />
                   </button>
                 </div>
@@ -373,7 +398,7 @@ export default function KioskClient({
           )}
 
           {/* STEP 3: READ WAIVER & SIGN */}
-          {step === 'sign' && lang && (
+          {step === 'sign' && (
             <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-6 md:p-10 animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-6">
               <div className="flex items-center gap-2">
                 <button
@@ -383,7 +408,7 @@ export default function KioskClient({
                   <ArrowLeft className="w-5 h-5" />
                 </button>
                 <h3 className="text-xl font-bold text-slate-800">
-                  {lang === 'es' ? 'Descargo de Responsabilidad' : 'Liability Waiver'}
+                  Descargo de Responsabilidad / Liability Waiver
                 </h3>
               </div>
 
@@ -394,15 +419,27 @@ export default function KioskClient({
                 </div>
               )}
 
-              {/* Scrollable Waiver Text Box */}
-              <div className="border border-slate-200 rounded-2xl p-6 bg-slate-50 overflow-y-auto max-h-64 leading-relaxed text-sm md:text-base text-slate-600 space-y-4">
-                <p className="font-extrabold text-teal-800 text-base md:text-lg">
-                  {lang === 'es' ? activeVersion.title_es : activeVersion.title_en}
-                </p>
-                <p className="whitespace-pre-line">
-                  {lang === 'es' ? activeVersion.content_es : activeVersion.content_en}
-                </p>
-                <span className="block text-right text-xs text-slate-400 font-mono">
+              {/* Scrollable Waiver Text Box showing both Spanish and English versions */}
+              <div className="border border-slate-200 rounded-2xl p-6 bg-slate-50 overflow-y-auto max-h-64 leading-relaxed text-sm md:text-base text-slate-600 space-y-6">
+                <div>
+                  <p className="font-extrabold text-teal-800 text-base md:text-lg mb-2">
+                    {activeVersion.title_es}
+                  </p>
+                  <p className="whitespace-pre-line">
+                    {activeVersion.content_es}
+                  </p>
+                </div>
+                
+                <div className="border-t border-slate-200 pt-6">
+                  <p className="font-extrabold text-teal-800 text-base md:text-lg mb-2">
+                    {activeVersion.title_en}
+                  </p>
+                  <p className="whitespace-pre-line">
+                    {activeVersion.content_en}
+                  </p>
+                </div>
+                
+                <span className="block text-right text-xs text-slate-400 font-mono pt-4">
                   Version: {activeVersion.version}
                 </span>
               </div>
@@ -416,21 +453,19 @@ export default function KioskClient({
                   className="w-6 h-6 accent-teal-700 mt-0.5 cursor-pointer shrink-0"
                 />
                 <span className="text-slate-700 text-sm md:text-base leading-snug">
-                  {lang === 'es'
-                    ? 'He leído, entiendo y acepto los términos y condiciones del presente formulario de descargo.'
-                    : 'I have read, understand and agree to the terms and conditions of this waiver.'}
+                  He leído, entiendo y acepto los términos y condiciones del presente formulario de descargo. / I have read, understand and agree to the terms and conditions of this waiver.
                 </span>
               </label>
 
               {/* Signature Capture */}
               <div className="space-y-2">
                 <span className="text-sm font-bold text-slate-600 block">
-                  {lang === 'es' ? 'Firma del Participante' : 'Participant Signature'} *
+                  Firma del Participante / Participant Signature *
                 </span>
                 <SignaturePad
                   onSave={(data) => setSignature(data)}
                   onClear={() => setSignature('')}
-                  placeholder={lang === 'es' ? 'Firme aquí con el dedo / Sign here with your finger' : 'Sign here with your finger'}
+                  placeholder="Firme aquí con el dedo / Sign here with your finger"
                 />
               </div>
 
@@ -438,12 +473,12 @@ export default function KioskClient({
               {isMinor && (
                 <div className="space-y-2 pt-6 border-t border-slate-100">
                   <span className="text-sm font-bold text-slate-600 block">
-                    {lang === 'es' ? 'Firma del Tutor Responsable' : 'Legal Guardian Signature'} *
+                    Firma del Tutor Responsable / Legal Guardian Signature *
                   </span>
                   <SignaturePad
                     onSave={(data) => setGuardianSignature(data)}
                     onClear={() => setGuardianSignature('')}
-                    placeholder={lang === 'es' ? 'Firme aquí con el dedo (Tutor) / Sign here with your finger (Guardian)' : 'Sign here with your finger (Guardian)'}
+                    placeholder="Firme aquí con el dedo (Tutor) / Sign here with your finger (Guardian)"
                   />
                 </div>
               )}
@@ -460,10 +495,8 @@ export default function KioskClient({
                 >
                   {submitting ? (
                     <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : lang === 'es' ? (
-                    'FIRMAR Y ENVIAR'
                   ) : (
-                    'SIGN & SUBMIT'
+                    'FIRMAR Y ENVIAR / SIGN & SUBMIT'
                   )}
                 </button>
               </div>
@@ -478,11 +511,11 @@ export default function KioskClient({
               </div>
               
               <h2 className="text-2xl md:text-3xl font-black text-slate-800 mb-2 uppercase tracking-wide">
-                {lang === 'es' ? 'Formulario registrado correctamente' : 'Waiver successfully submitted'}
+                Formulario registrado correctamente / Waiver successfully submitted
               </h2>
               
               <p className="text-slate-500 text-base md:text-lg mb-6">
-                {lang === 'es' ? '¡Gracias!' : 'Thank you!'}
+                ¡Gracias! / Thank you!
               </p>
 
               {waiverNumber && (
@@ -492,12 +525,74 @@ export default function KioskClient({
               )}
 
               <p className="text-xs text-slate-400 italic">
-                {lang === 'es' ? 'Redireccionando al inicio...' : 'Redirecting back to language selection...'}
+                Redireccionando al inicio... / Redirecting back...
               </p>
             </div>
           )}
         </main>
       </div>
+
+      {/* PIN VERIFICATION MODAL */}
+      {showPinModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-100 p-6 space-y-6 text-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="mx-auto w-12 h-12 rounded-full bg-teal-50 text-teal-800 flex items-center justify-center text-xl">
+              🔑
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-800">
+                Desbloquear Agencia
+              </h3>
+              <p className="text-slate-400 text-xs mt-1">
+                Ingrese el PIN de seguridad de AMA para habilitar la selección.
+              </p>
+            </div>
+            
+            <input
+              type="password"
+              value={enteredPin}
+              onChange={(e) => {
+                setEnteredPin(e.target.value)
+                setPinError(false)
+              }}
+              placeholder="PIN"
+              className={`w-full p-3 text-center border rounded-xl font-bold text-lg focus:outline-none focus:ring-4 ${
+                pinError 
+                  ? 'border-rose-300 focus:ring-rose-100 bg-rose-50 text-rose-800' 
+                  : 'border-slate-200 focus:border-teal-700 focus:ring-teal-100'
+              }`}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleVerifyPin()
+                }
+              }}
+            />
+
+            {pinError && (
+              <p className="text-rose-600 text-xs font-semibold">
+                PIN incorrecto / Incorrect PIN
+              </p>
+            )}
+
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setShowPinModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-500 border border-slate-200 rounded-xl hover:bg-slate-50 cursor-pointer"
+              >
+                Cancelar / Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleVerifyPin}
+                className="px-4 py-2 text-xs font-bold text-white bg-teal-800 hover:bg-teal-900 rounded-xl cursor-pointer"
+              >
+                Confirmar / Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </InactivityTracker>
   )
 }

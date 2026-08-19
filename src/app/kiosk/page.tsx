@@ -28,6 +28,15 @@ export default async function KioskPage() {
   const minAge = settings.min_age ?? 18
   const inactivityTimeout = settings.inactivity_timeout ?? 120
   const confirmationTimeout = settings.confirmation_timeout ?? 5
+  const kioskPin = settings.kiosk_pin ?? '1234'
+
+  // Fetch active agencies
+  const { data: agenciesData } = await supabase
+    .from('agencies')
+    .select('id, name')
+    .order('name', { ascending: true })
+
+  const agencies = agenciesData || []
 
   return (
     <KioskClient
@@ -42,6 +51,8 @@ export default async function KioskPage() {
       minAge={minAge}
       inactivityTimeout={inactivityTimeout}
       confirmationTimeout={confirmationTimeout}
+      kioskPin={kioskPin}
+      agencies={agencies}
     />
   )
 }

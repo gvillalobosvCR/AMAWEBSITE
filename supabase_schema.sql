@@ -203,3 +203,31 @@ CREATE POLICY "Allow ADMIN to read signatures" ON storage.objects
     bucket_id = 'waiver-signatures' AND
     (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'ADMIN'
   );
+
+-- 12. Agencies Table & Relations
+CREATE TABLE IF NOT EXISTS public.agencies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Enable RLS
+ALTER TABLE public.agencies ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+CREATE POLICY "Allow authenticated to view agencies" ON public.agencies
+  FOR SELECT TO authenticated USING (TRUE);
+
+CREATE POLICY "Allow ADMIN to manage agencies" ON public.agencies
+  FOR ALL TO authenticated USING (
+    auth.uid() IN (SELECT id FROM public.profiles WHERE role = 'ADMIN')
+  );
+
+-- Add column to waivers
+ALTER TABLE public.waivers ADD COLUMN IF NOT EXISTS agency_id UUID REFERENCES public.agencies(id) ON DELETE SET NULL;
+
+-- Seed Default Kiosk PIN
+INSERT INTO public.app_settings (key, value, updated_at) VALUES
+('kiosk_pin', '{"value": "1234"}', NOW())
+ON CONFLICT (key) DO NOTHING;
+

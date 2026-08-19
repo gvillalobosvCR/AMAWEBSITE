@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { getSignatureUrl } from '@/app/actions/waiver'
 import { generateWaiverPDF } from '@/lib/pdf-generator'
 import { Search, Eye, FileDown, X, ShieldAlert, Calendar, User, Baby, HelpCircle } from 'lucide-react'
+import { formatDateTimeUTC } from '@/lib/date-utils'
 
 interface WaiverItem {
   id: string
@@ -25,18 +26,24 @@ interface WaiverItem {
     relationship: string
     guardian_signature_path: string
   } | null
+  agencies?: { name: string } | null
 }
 
 interface WaiversClientProps {
   waivers: any[]
   totalCount: number
   profiles: { id: string; full_name: string | null }[]
+  agencies: { id: string; name: string }[]
+  currentPage: number
+  pageSize: number
   currentFilters: {
     search: string
     lang: string
     ageGroup: string
     tablet: string
-    date: string
+    startDate: string
+    endDate: string
+    agency: string
   }
 }
 
@@ -44,6 +51,9 @@ export default function WaiversClient({
   waivers,
   totalCount,
   profiles,
+  agencies,
+  currentPage,
+  pageSize,
   currentFilters,
 }: WaiversClientProps) {
   const router = useRouter()
@@ -54,7 +64,10 @@ export default function WaiversClient({
   const [lang, setLang] = useState(currentFilters.lang)
   const [ageGroup, setAgeGroup] = useState(currentFilters.ageGroup)
   const [tablet, setTablet] = useState(currentFilters.tablet)
-  const [date, setDate] = useState(currentFilters.date)
+  const [startDate, setStartDate] = useState(currentFilters.startDate)
+  const [endDate, setEndDate] = useState(currentFilters.endDate)
+  const [agency, setAgency] = useState(currentFilters.agency)
+  const [exporting, setExporting] = useState(false)
 
   // Selected waiver details modal state
   const [selectedWaiver, setSelectedWaiver] = useState<WaiverItem | null>(null)
@@ -83,7 +96,7 @@ export default function WaiversClient({
     }
   }, [selectedWaiver])
 
-  // Apply filters to route query params
+  // Apply filters to route query params (resets page to 1)
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const params = new URLSearchParams()
@@ -91,7 +104,10 @@ export default function WaiversClient({
     if (lang) params.set('lang', lang)
     if (ageGroup) params.set('ageGroup', ageGroup)
     if (tablet) params.set('tablet', tablet)
-    if (date) params.set('date', date)
+    if (startDate) params.set('startDate', startDate)
+    if (endDate) params.set('endDate', endDate)
+    if (agency) params.set('agency', agency)
+    params.set('page', '1')
 
     router.push(`/admin/waivers?${params.toString()}`)
   }
@@ -101,8 +117,131 @@ export default function WaiversClient({
     setLang('')
     setAgeGroup('')
     setTablet('')
-    setDate('')
+    setStartDate('')
+    setEndDate('')
+    setAgency('')
     router.push('/admin/waivers')
+  }
+
+  const handleExportCSV = async () => {
+    if (exporting) return
+    setExporting(true)
+    try {
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+      
+      let query = supabase
+        .from('waivers')
+        .select(`
+          waiver_number,
+          full_name,
+          id_passport,
+          age,
+          is_minor,
+          language,
+          created_at,
+          profiles (full_name),
+          agencies (name)
+        `)
+        .order('created_at', { ascending: false })
+
+      // Apply current search and filter states
+      if (search.trim()) {
+        query = query.or(`waiver_number.ilike.%${search}%,full_name.ilike.%${search}%,id_passport.ilike.%${search}%`)
+      }
+      if (lang) {
+        query = query.eq('language', lang)
+      }
+      if (ageGroup) {
+        if (ageGroup === 'minor') {
+          query = query.eq('is_minor', true)
+        } else if (ageGroup === 'adult') {
+          query = query.eq('is_minor', false)
+        }
+      }
+      if (tablet) {
+        query = query.eq('tablet_user_id', tablet)
+      }
+      if (agency) {
+        query = query.eq('agency_id', agency)
+      }
+      if (startDate) {
+        const startUTC = new Date(startDate + 'T00:00:00')
+        startUTC.setHours(startUTC.getHours() + 6)
+        query = query.gte('created_at', startUTC.toISOString())
+      }
+      if (endDate) {
+        const endUTC = new Date(endDate + 'T23:59:59')
+        endUTC.setHours(endUTC.getHours() + 6)
+        query = query.lte('created_at', endUTC.toISOString())
+      }
+
+      const { data: exportData, error } = await query
+      if (error) {
+        alert('Error al exportar: ' + error.message)
+        return
+      }
+
+      if (!exportData || exportData.length === 0) {
+        alert('No hay datos para exportar.')
+        return
+      }
+
+      // CSV headers
+      const headers = [
+        'Código de Waiver / Waiver Code',
+        'Nombre Completo / Full Name',
+        'Identificación / Passport ID',
+        'Edad / Age',
+        'Menor de Edad / Minor',
+        'Idioma / Language',
+        'Agencia / Agency',
+        'Registrador / Tablet User',
+        'Fecha y Hora / Date & Time',
+      ]
+      
+      // CSV rows mapping
+      const rows = exportData.map((item) => {
+        const w = item as any
+        return [
+          w.waiver_number,
+          `"${w.full_name?.replace(/"/g, '""') || ''}"`,
+          `"${w.id_passport?.replace(/"/g, '""') || ''}"`,
+          w.age,
+          w.is_minor ? 'Sí / Yes' : 'No',
+          w.language?.toUpperCase() || '',
+          w.agencies?.name ? `"${w.agencies.name.replace(/"/g, '""')}"` : 'N/A',
+          w.profiles?.full_name ? `"${w.profiles.full_name.replace(/"/g, '""')}"` : 'Kiosk',
+          `"${formatDateTimeUTC(w.created_at)}"`
+        ]
+      })
+      
+      // Create CSV string using semicolon (;) as separator for native Spanish Excel compatibility
+      const csvContent = [headers.join(';'), ...rows.map(e => e.join(';'))].join('\n')
+      
+      // Add UTF-8 BOM to prevent Excel display issues with accents
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.setAttribute('href', url)
+      
+      const dateStr = new Date().toISOString().split('T')[0]
+      link.setAttribute('download', `AMA_Descargos_${dateStr}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (err: any) {
+      console.error(err)
+      alert('Error al realizar la exportación: ' + err.message)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handlePageChange = (newPage: number) => {
+    const params = new URLSearchParams(window.location.search)
+    params.set('page', newPage.toString())
+    router.push(`/admin/waivers?${params.toString()}`)
   }
 
   const handleDownloadPDF = async (w: WaiverItem) => {
@@ -149,7 +288,7 @@ export default function WaiversClient({
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
           
           {/* Text search */}
-          <div className="md:col-span-4 relative">
+          <div className="md:col-span-3 relative">
             <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
               <Search className="w-5 h-5" />
             </span>
@@ -162,29 +301,19 @@ export default function WaiversClient({
             />
           </div>
 
-          {/* Lang select */}
-          <div className="md:col-span-2">
+          {/* Agency select */}
+          <div className="md:col-span-3">
             <select
-              value={lang}
-              onChange={(e) => setLang(e.target.value)}
+              value={agency}
+              onChange={(e) => setAgency(e.target.value)}
               className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-teal-700 outline-none transition-all cursor-pointer"
             >
-              <option value="">Idioma / Language (Todos)</option>
-              <option value="es">Español</option>
-              <option value="en">English</option>
-            </select>
-          </div>
-
-          {/* Age select */}
-          <div className="md:col-span-2">
-            <select
-              value={ageGroup}
-              onChange={(e) => setAgeGroup(e.target.value)}
-              className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-teal-700 outline-none transition-all cursor-pointer"
-            >
-              <option value="">Edad / Category (Todos)</option>
-              <option value="adult">Adultos (&gt;= 18)</option>
-              <option value="minor">Menores (&lt; 18)</option>
+              <option value="">Agencia / Agency (Todas)</option>
+              {agencies.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -204,32 +333,86 @@ export default function WaiversClient({
             </select>
           </div>
 
-          {/* Date select */}
+          {/* Age select */}
           <div className="md:col-span-2">
+            <select
+              value={ageGroup}
+              onChange={(e) => setAgeGroup(e.target.value)}
+              className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-teal-700 outline-none transition-all cursor-pointer"
+            >
+              <option value="">Edad / Category (Todos)</option>
+              <option value="adult">Adultos (&gt;= 18)</option>
+              <option value="minor">Menores (&lt; 18)</option>
+            </select>
+          </div>
+
+          {/* Lang select */}
+          <div className="md:col-span-2">
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value)}
+              className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-teal-700 outline-none transition-all cursor-pointer"
+            >
+              <option value="">Idioma / Lang (Todos)</option>
+              <option value="es">Español</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+
+          {/* Date range start */}
+          <div className="md:col-span-3 flex flex-col gap-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide px-1">Fecha Inicio / Start Date</span>
             <input
               type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
               className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-teal-700 outline-none transition-all cursor-pointer"
             />
           </div>
 
+          {/* Date range end */}
+          <div className="md:col-span-3 flex flex-col gap-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide px-1">Fecha Fin / End Date</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-teal-700 outline-none transition-all cursor-pointer"
+            />
+          </div>
+
+          {/* Spacer/Empty */}
+          <div className="md:col-span-6" />
+
         </div>
 
-        <div className="flex justify-end gap-3 pt-2">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-2 border-t border-slate-100 mt-2">
+          {/* Export to Excel action button */}
           <button
             type="button"
-            onClick={handleClearFilters}
-            className="px-4 py-2 text-sm font-semibold text-slate-500 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer"
+            disabled={exporting}
+            onClick={handleExportCSV}
+            className="w-full sm:w-auto px-5 py-2.5 text-sm font-bold text-emerald-800 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5"
           >
-            Limpiar filtros
+            <FileDown className="w-4 h-4 text-emerald-700 shrink-0" />
+            <span>{exporting ? 'Exportando... / Exporting...' : 'Exportar Excel / CSV'}</span>
           </button>
-          <button
-            type="submit"
-            className="px-6 py-2 text-sm font-bold text-white bg-teal-800 hover:bg-teal-900 rounded-xl shadow-md cursor-pointer"
-          >
-            Buscar / Filter
-          </button>
+          
+          <div className="flex w-full sm:w-auto gap-3 justify-end">
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="px-5 py-2.5 text-sm font-semibold text-slate-500 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              Limpiar filtros
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-2.5 text-sm font-bold text-white bg-teal-800 hover:bg-teal-900 rounded-xl shadow-md cursor-pointer"
+            >
+              Buscar / Filter
+            </button>
+          </div>
         </div>
       </form>
 
@@ -264,7 +447,12 @@ export default function WaiversClient({
                         {w.waiver_number}
                       </td>
                       <td className="px-6 py-4 font-semibold text-slate-800">
-                        {w.full_name}
+                        <div>{w.full_name}</div>
+                        {w.agencies?.name && (
+                          <span className="text-[10px] bg-teal-50 text-teal-700 border border-teal-100 font-bold px-1.5 py-0.5 rounded-full mt-1 inline-block uppercase">
+                            🏢 {w.agencies.name}
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4 font-mono">{w.id_passport}</td>
                       <td className="px-6 py-4">
@@ -279,7 +467,7 @@ export default function WaiversClient({
                         {w.profiles?.full_name || 'Tablet Kiosk'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {dateObj.toLocaleDateString('es-CR')} {dateObj.toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit' })}
+                        {formatDateTimeUTC(w.created_at)}
                       </td>
                       <td className="px-6 py-4 text-right whitespace-nowrap">
                         <button
@@ -304,6 +492,36 @@ export default function WaiversClient({
           </table>
         </div>
       </div>
+
+      {/* Pagination Controls */}
+      {(() => {
+        const totalPages = Math.ceil(totalCount / pageSize)
+        return totalPages > 1 ? (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white px-6 py-4 border border-slate-100 rounded-2xl shadow-sm mt-4">
+            <span className="text-sm text-slate-500">
+              Página <span className="font-semibold text-slate-800">{currentPage}</span> de <span className="font-semibold text-slate-800">{totalPages}</span> (Mostrando {waivers.length} de {totalCount} descargos)
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage <= 1}
+                className="px-4 py-2 border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white text-slate-600 rounded-xl text-sm font-semibold transition-colors cursor-pointer disabled:cursor-not-allowed"
+              >
+                Anterior / Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage >= totalPages}
+                className="px-4 py-2 border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white text-slate-600 rounded-xl text-sm font-semibold transition-colors cursor-pointer disabled:cursor-not-allowed"
+              >
+                Siguiente / Next
+              </button>
+            </div>
+          </div>
+        ) : null
+      })()}
 
       {/* DETAIL VIEW MODAL */}
       {selectedWaiver && (
@@ -336,13 +554,19 @@ export default function WaiversClient({
                 <div className="space-y-2">
                   <span className="text-xxs font-bold text-slate-400 block uppercase tracking-wider">Detalles del Participante</span>
                   <div className="flex items-center gap-2"><User className="w-4 h-4 text-slate-400 shrink-0" /><span className="font-bold text-slate-800">{selectedWaiver.full_name}</span></div>
+                  {selectedWaiver.agencies?.name && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400 text-xs shrink-0">🏢</span>
+                      <span>Agencia: <span className="font-bold text-teal-800">{selectedWaiver.agencies.name}</span></span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-slate-400 shrink-0" /><span>ID: <span className="font-semibold">{selectedWaiver.id_passport}</span></span></div>
                   <div className="flex items-center gap-2"><Baby className="w-4 h-4 text-slate-400 shrink-0" /><span>Edad: <span className="font-semibold">{selectedWaiver.age} años</span></span></div>
                 </div>
 
                 <div className="space-y-2 border-t md:border-t-0 md:border-l border-slate-200 pt-4 md:pt-0 md:pl-6">
                   <span className="text-xxs font-bold text-slate-400 block uppercase tracking-wider">Detalles del Registro</span>
-                  <div className="flex items-center gap-2"><Calendar className="w-4 h-4 text-slate-400 shrink-0" /><span>Fecha: <span className="font-semibold">{new Date(selectedWaiver.created_at).toLocaleString('es-CR')}</span></span></div>
+                  <div className="flex items-center gap-2"><Calendar className="w-4 h-4 text-slate-400 shrink-0" /><span>Fecha: <span className="font-semibold">{formatDateTimeUTC(selectedWaiver.created_at)}</span></span></div>
                   <div className="flex items-center gap-2"><HelpCircle className="w-4 h-4 text-slate-400 shrink-0" /><span>Idioma: <span className="font-semibold uppercase">{selectedWaiver.language}</span></span></div>
                   <div className="flex items-center gap-2"><User className="w-4 h-4 text-slate-400 shrink-0" /><span>Tablet: <span className="font-semibold">{selectedWaiver.profiles?.full_name || 'Kiosk'}</span></span></div>
                 </div>

@@ -8,16 +8,19 @@ interface SettingsClientProps {
   minAge: number
   inactivityTimeout: number
   confirmationTimeout: number
+  kioskPin: string
 }
 
 export default function SettingsClient({
   minAge: initialMinAge,
   inactivityTimeout: initialInactivityTimeout,
   confirmationTimeout: initialConfirmationTimeout,
+  kioskPin: initialKioskPin,
 }: SettingsClientProps) {
   const [minAge, setMinAge] = useState(initialMinAge.toString())
   const [inactivityTimeout, setInactivityTimeout] = useState(initialInactivityTimeout.toString())
   const [confirmationTimeout, setConfirmationTimeout] = useState(initialConfirmationTimeout.toString())
+  const [kioskPin, setKioskPin] = useState(initialKioskPin)
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -31,15 +34,16 @@ export default function SettingsClient({
 
     try {
       // Run saving actions sequentially or in parallel
-      const [resAge, resInactivity, resConfirm] = await Promise.all([
+      const [resAge, resInactivity, resConfirm, resPin] = await Promise.all([
         saveAppSettings('min_age', parseInt(minAge, 10)),
         saveAppSettings('inactivity_timeout', parseInt(inactivityTimeout, 10)),
         saveAppSettings('confirmation_timeout', parseInt(confirmationTimeout, 10)),
+        saveAppSettings('kiosk_pin', kioskPin.trim()),
       ])
 
-      if (resAge.error || resInactivity.error || resConfirm.error) {
+      if (resAge.error || resInactivity.error || resConfirm.error || resPin.error) {
         setError(
-          resAge.error || resInactivity.error || resConfirm.error || 'Error al guardar configuraciones'
+          resAge.error || resInactivity.error || resConfirm.error || resPin.error || 'Error al guardar configuraciones'
         )
       } else {
         setSuccess(true)
@@ -131,7 +135,7 @@ export default function SettingsClient({
                   Tiempo de pantalla de confirmación (segundos)
                 </h4>
                 <p className="text-slate-400 text-xs md:text-sm">
-                  Duración de la pantalla de éxito "Gracias" después de firmar y antes de regresar a la pantalla de idiomas.
+                  Duración de la pantalla de éxito "Gracias" después de firmar y antes de reiniciar el formulario.
                 </p>
               </div>
               <div className="w-full md:w-32 shrink-0">
@@ -139,6 +143,28 @@ export default function SettingsClient({
                   type="number"
                   value={confirmationTimeout}
                   onChange={(e) => setConfirmationTimeout(e.target.value)}
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-center font-bold text-slate-800 focus:bg-white focus:border-teal-700 outline-none text-base md:text-lg"
+                />
+              </div>
+            </div>
+
+            {/* Setting 4: Kiosk PIN */}
+            <div className="flex flex-col md:flex-row gap-4 items-start justify-between p-4 hover:bg-slate-50 rounded-2xl transition-colors">
+              <div className="space-y-1 max-w-md">
+                <h4 className="font-bold text-slate-800 flex items-center gap-1.5 text-sm md:text-base">
+                  <ShieldCheck className="w-5 h-5 text-teal-800" />
+                  PIN de Seguridad del Kiosco
+                </h4>
+                <p className="text-slate-400 text-xs md:text-sm">
+                  Código de seguridad utilizado por el personal de AMA para desbloquear la selección de agencias en la pantalla del kiosco.
+                </p>
+              </div>
+              <div className="w-full md:w-32 shrink-0">
+                <input
+                  type="text"
+                  maxLength={8}
+                  value={kioskPin}
+                  onChange={(e) => setKioskPin(e.target.value)}
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-center font-bold text-slate-800 focus:bg-white focus:border-teal-700 outline-none text-base md:text-lg"
                 />
               </div>
