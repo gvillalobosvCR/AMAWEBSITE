@@ -5,6 +5,7 @@ import InactivityTracker from '@/components/InactivityTracker'
 import SignaturePad from '@/components/SignaturePad'
 import { submitWaiver } from '@/app/actions/waiver'
 import { ArrowLeft, CheckCircle2, ChevronRight, AlertTriangle } from 'lucide-react'
+import { generateWaiverPDF } from '@/lib/pdf-generator'
 
 interface KioskClientProps {
   activeVersion: {
@@ -178,6 +179,48 @@ export default function KioskClient({
     } else if (result.success && result.waiverNumber) {
       setWaiverNumber(result.waiverNumber)
       setStep('success')
+
+      // Auto-send email if an email address was typed
+      if (email.trim()) {
+        try {
+          const pdfDoc = await generateWaiverPDF({
+            waiverNumber: result.waiverNumber,
+            fullName,
+            idPassport,
+            age: parseInt(age, 10),
+            language: lang!,
+            exactContent: `${activeVersion.title_es} / ${activeVersion.title_en}\n\n${activeVersion.content_es}\n\n${activeVersion.content_en}`,
+            createdAt: new Date().toISOString(),
+            version: isMinor ? '1.0 (Minor)' : '1.0',
+            signatureUrl: signature,
+            isMinor,
+            guardianName: isMinor ? guardianName : undefined,
+            guardianIdPassport: isMinor ? guardianId : undefined,
+            relationship: isMinor ? relationship : undefined,
+            guardianSignatureUrl: isMinor ? guardianSignature : undefined,
+            email: email.trim(),
+          }, false)
+
+          const pdfBase64 = pdfDoc.output('datauristring').split(',')[1]
+
+          // Async call to server action (fire-and-forget inside kiosk)
+          const { sendWaiverEmail } = await import('@/app/actions/email')
+          sendWaiverEmail({
+            email: email.trim(),
+            fullName,
+            waiverNumber: result.waiverNumber,
+            pdfBase64
+          }).then(res => {
+            if (res.error) {
+              console.error('Auto-email sending error:', res.error)
+            } else {
+              console.log('Waiver auto-email sent successfully!')
+            }
+          })
+        } catch (mailErr) {
+          console.error('Error preparing auto-email:', mailErr)
+        }
+      }
     }
   }
 

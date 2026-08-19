@@ -69,6 +69,7 @@ export default function WaiversClient({
   const [endDate, setEndDate] = useState(currentFilters.endDate)
   const [agency, setAgency] = useState(currentFilters.agency)
   const [exporting, setExporting] = useState(false)
+  const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
 
   // Selected waiver details modal state
   const [selectedWaiver, setSelectedWaiver] = useState<WaiverItem | null>(null)
@@ -246,6 +247,77 @@ export default function WaiversClient({
     const params = new URLSearchParams(window.location.search)
     params.set('page', newPage.toString())
     router.push(`/admin/waivers?${params.toString()}`)
+  }
+
+  const handleSendEmailDirectly = async (w: WaiverItem) => {
+    let targetEmail = w.email?.trim() || ''
+    
+    if (!targetEmail) {
+      const promptedEmail = prompt('Este waiver no tiene un correo electrónico registrado. Ingrese el correo electrónico del destinatario: / This waiver does not have a registered email. Enter the recipient\'s email:')
+      if (!promptedEmail || !promptedEmail.trim()) {
+        return
+      }
+      targetEmail = promptedEmail.trim()
+    }
+    
+    setSendingEmailId(w.id)
+    try {
+      // 1. Fetch signature URLs first
+      const sigUrl = await getSignatureUrl(w.signature_path)
+      if (!sigUrl) {
+        alert('Error al obtener URL de firma / Error getting signature URL')
+        return
+      }
+      
+      let guardSigUrl: string | undefined = undefined
+      if (w.is_minor && w.guardian_information?.guardian_signature_path) {
+        const guardUrl = await getSignatureUrl(w.guardian_information.guardian_signature_path)
+        if (guardUrl) {
+          guardSigUrl = guardUrl
+        }
+      }
+
+      // 2. Generate PDF in background (shouldDownload = false)
+      const pdfDoc = await generateWaiverPDF({
+        waiverNumber: w.waiver_number,
+        fullName: w.full_name,
+        idPassport: w.id_passport,
+        age: w.age,
+        language: w.language,
+        exactContent: w.exact_content,
+        createdAt: w.created_at,
+        email: targetEmail,
+        version: w.guardian_information ? '1.0 (Minor)' : '1.0',
+        signatureUrl: sigUrl,
+        isMinor: w.is_minor,
+        guardianName: w.guardian_information?.guardian_name,
+        guardianIdPassport: w.guardian_information?.guardian_id_passport,
+        relationship: w.guardian_information?.relationship,
+        guardianSignatureUrl: guardSigUrl,
+      }, false)
+
+      const pdfBase64 = pdfDoc.output('datauristring').split(',')[1]
+
+      // 3. Send email via server action
+      const { sendWaiverEmail } = await import('@/app/actions/email')
+      const emailRes = await sendWaiverEmail({
+        email: targetEmail,
+        fullName: w.full_name,
+        waiverNumber: w.waiver_number,
+        pdfBase64
+      })
+
+      if (emailRes.error) {
+        alert(emailRes.error)
+      } else {
+        alert(`Correo enviado con éxito a ${targetEmail} / Email successfully sent to ${targetEmail}`)
+      }
+    } catch (err: any) {
+      console.error(err)
+      alert('Error al enviar correo: ' + err.message)
+    } finally {
+      setSendingEmailId(null)
+    }
   }
 
   const handleDownloadPDF = async (w: WaiverItem) => {
@@ -475,13 +547,37 @@ export default function WaiversClient({
                         {formatDateTimeUTC(w.created_at)}
                       </td>
                       <td className="px-6 py-4 text-right whitespace-nowrap">
-                        <button
-                          onClick={() => setSelectedWaiver(w)}
-                          className="p-2 text-teal-700 hover:text-white hover:bg-teal-800 border border-teal-100 hover:border-teal-800 rounded-xl transition-all cursor-pointer inline-flex items-center gap-1.5 text-xs font-bold shadow-sm"
-                        >
-                          <Eye className="w-4 h-4" />
-                          <span>Ver</span>
-                        </button>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => setSelectedWaiver(w)}
+                            className="p-2 text-teal-700 hover:text-white hover:bg-teal-800 border border-teal-100 hover:border-teal-800 rounded-xl transition-all cursor-pointer inline-flex items-center gap-1.5 text-xs font-bold shadow-sm"
+                          >
+                            <Eye className="w-4 h-4" />
+                            <span>Ver</span>
+                          </button>
+                          
+                          <button
+                            disabled={sendingEmailId !== null}
+                            onClick={() => handleSendEmailDirectly(w)}
+                            className={`p-2 text-xs font-bold border rounded-xl transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-sm ${
+                              sendingEmailId === w.id
+                                ? 'bg-amber-50 border-amber-200 text-amber-800 cursor-not-allowed'
+                                : 'bg-white text-emerald-800 border-emerald-100 hover:bg-emerald-800 hover:text-white hover:border-emerald-800'
+                            }`}
+                          >
+                            {sendingEmailId === w.id ? (
+                              <>
+                                <div className="w-3.5 h-3.5 border-2 border-amber-800 border-t-transparent rounded-full animate-spin shrink-0" />
+                                <span>Enviando...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Mail className="w-4 h-4 shrink-0" />
+                                <span>Enviar Email</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -651,6 +747,18 @@ export default function WaiversClient({
                 className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 Cerrar
+              </button>
+              <button
+                onClick={() => handleSendEmailDirectly(selectedWaiver)}
+                disabled={loadingUrls || sendingEmailId !== null || !signedSigUrl}
+                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold text-sm rounded-xl shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                {sendingEmailId === selectedWaiver.id ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Mail className="w-4 h-4" />
+                )}
+                <span>Enviar por Correo</span>
               </button>
               <button
                 onClick={() => handleDownloadPDF(selectedWaiver)}

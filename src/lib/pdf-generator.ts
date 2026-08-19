@@ -31,7 +31,7 @@ async function getBase64FromUrl(url: string): Promise<string> {
   })
 }
 
-export async function generateWaiverPDF(data: PDFData) {
+export async function generateWaiverPDF(data: PDFData, shouldDownload = true) {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -226,5 +226,8 @@ export async function generateWaiverPDF(data: PDFData) {
   }
 
   // 6. SAVE AND DOWNLOAD
-  doc.save(`Waiver_${data.waiverNumber}.pdf`)
+  if (shouldDownload) {
+    doc.save(`Waiver_${data.waiverNumber}.pdf`)
+  }
+  return doc
 }

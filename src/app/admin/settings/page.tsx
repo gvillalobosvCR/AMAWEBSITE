@@ -23,12 +23,29 @@ export default async function SettingsPage() {
   const confirmationTimeout = settings.confirmation_timeout ?? 5
   const kioskPin = settings.kiosk_pin ?? '1234'
 
+  const smtpSettings = settings.smtp_settings ?? {
+    host: '',
+    port: 587,
+    user: '',
+    password: '',
+    secure: false,
+    fromName: 'Arenal Mundo Aventura',
+    fromEmail: '',
+  }
+
+  const emailSettings = settings.email_settings ?? {
+    subject: 'Su Descargo de Responsabilidad / Your Waiver Form',
+    body: 'Hola {name},\n\nAdjunto encontrará la copia en PDF de su descargo de responsabilidad firmado.\n\nHello {name},\n\nPlease find attached the PDF copy of your signed waiver form.',
+  }
+
   return (
     <SettingsClient
       minAge={minAge}
       inactivityTimeout={inactivityTimeout}
       confirmationTimeout={confirmationTimeout}
       kioskPin={kioskPin}
+      smtpSettings={smtpSettings}
+      emailSettings={emailSettings}
     />
   )
 }

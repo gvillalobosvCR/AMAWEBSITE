@@ -234,3 +234,8 @@ ON CONFLICT (key) DO NOTHING;
 -- 13. Add email column to waivers
 ALTER TABLE public.waivers ADD COLUMN IF NOT EXISTS email TEXT;
 
+-- Seed Default SMTP and Email template settings
+INSERT INTO public.app_settings (key, value, updated_at) VALUES
+('smtp_settings', '{"value": {"host": "", "port": 587, "user": "", "password": "", "secure": false, "fromName": "Arenal Mundo Aventura", "fromEmail": ""}}', NOW()),
+('email_settings', '{"value": {"subject": "Su Descargo de Responsabilidad / Your Waiver Form", "body": "Hola {name},\\n\\nAdjunto encontrará la copia en PDF de su descargo de responsabilidad firmado.\\n\\nHello {name},\\n\\nPlease find attached the PDF copy of your signed waiver form."}}', NOW())
+ON CONFLICT (key) DO NOTHING;
