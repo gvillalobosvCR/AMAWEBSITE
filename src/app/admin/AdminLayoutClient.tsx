@@ -49,11 +49,8 @@ export default function AdminLayoutClient({ userProfile, children }: AdminLayout
       
       {/* Mobile Top Navbar */}
       <header className="bg-teal-900 text-white p-4 flex items-center justify-between md:hidden shadow-md shrink-0">
-        <div className="flex flex-col">
-          <span className="text-xl font-bold font-serif leading-none">Arenal</span>
-          <span className="text-[8px] uppercase tracking-widest text-emerald-400 font-bold -mt-0.5">
-            Mundo Aventura
-          </span>
+        <div className="flex items-center">
+          <img src="/logo.png" alt="Arenal Mundo Aventura" className="h-8 w-auto brightness-0 invert" />
         </div>
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -69,14 +66,8 @@ export default function AdminLayoutClient({ userProfile, children }: AdminLayout
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Branding header */}
-        <div className="p-6 border-b border-teal-900 bg-teal-900/20 hidden md:block">
-          <h2 className="text-2xl font-extrabold text-white font-serif leading-none">
-            Arenal
-          </h2>
-          <p className="text-[9px] tracking-widest text-emerald-400 font-bold uppercase mt-0.5">
-            Mundo Aventura
-          </p>
+        <div className="p-6 border-b border-teal-900 bg-teal-900/20 hidden md:block flex justify-center">
+          <img src="/logo.png" alt="Arenal Mundo Aventura" className="h-10 w-auto brightness-0 invert mx-auto" />
         </div>
 
         {/* User Info Capsule */}

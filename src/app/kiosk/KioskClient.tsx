@@ -232,13 +232,8 @@ export default function KioskClient({
         <header className="bg-white border-b border-slate-100 shadow-sm shrink-0">
           <div className="bg-teal-900 h-4 w-full" />
           <div className="max-w-4xl mx-auto px-6 py-4 flex justify-between items-center">
-            <div className="flex flex-col">
-              <h1 className="text-3xl font-extrabold text-teal-800 font-serif leading-none tracking-tight">
-                Arenal
-              </h1>
-              <span className="text-[10px] tracking-widest text-emerald-600 font-bold uppercase">
-                Mundo Aventura
-              </span>
+            <div className="flex items-center">
+              <img src="/logo.png" alt="Arenal Mundo Aventura" className="h-10 md:h-12 w-auto" />
             </div>
             {step !== 'success' && (
               <button
@@ -254,9 +249,24 @@ export default function KioskClient({
         {/* Form Body */}
         <main className="flex-1 max-w-4xl w-full mx-auto p-4 md:p-8 flex flex-col justify-center">
 
+          {step !== 'success' && (
+            <div className="text-center mb-6 md:mb-8 space-y-1">
+              <h2 className="text-xl md:text-2xl font-extrabold text-teal-900 tracking-wide">
+                ACSUFA PARQUE ECOLÓGICO S.A.
+              </h2>
+              <p className="text-xs md:text-sm font-bold text-emerald-600">
+                Parque Ecológico Tropical / Ecological Tropical Park
+              </p>
+              <div className="text-[10px] md:text-xs font-bold tracking-widest text-slate-400 uppercase pt-1">
+                FORMULARIO DE DESCARGO / WAIVER
+              </div>
+            </div>
+          )}
+
           {/* STEP 2: PERSONAL DETAILS */}
           {step === 'details' && (
-            <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-6 md:p-10 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-6 md:p-10">
               <div className="flex items-center gap-2 mb-6">
                 <h3 className="text-xl font-bold text-slate-800">
                   Información del Participante / Participant Details
@@ -454,6 +464,15 @@ export default function KioskClient({
                 </div>
               </div>
             </div>
+
+            {/* Decorative Icons Row */}
+            <div className="flex justify-center items-center gap-10 md:gap-16 pt-2 pb-6">
+              <img src="/mount.png" alt="Volcano" className="h-12 md:h-16 w-auto opacity-70 hover:opacity-100 hover:scale-105 transition-all duration-300" />
+              <img src="/leaf.png" alt="Leaf" className="h-12 md:h-16 w-auto opacity-70 hover:opacity-100 hover:scale-105 transition-all duration-300" />
+              <img src="/jaguar.png" alt="Jaguar" className="h-12 md:h-16 w-auto opacity-70 hover:opacity-100 hover:scale-105 transition-all duration-300" />
+              <img src="/water.png" alt="Water" className="h-12 md:h-16 w-auto opacity-70 hover:opacity-100 hover:scale-105 transition-all duration-300" />
+            </div>
+          </div>
           )}
 
           {/* STEP 3: READ WAIVER & SIGN */}

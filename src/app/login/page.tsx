@@ -40,14 +40,9 @@ export default function LoginPage() {
 
       <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-100 p-8 md:p-10 relative z-10">
         <div className="flex flex-col items-center mb-8">
-          {/* Mock Logo matching Arenal Mundo Aventura */}
+          {/* Logo matching Arenal Mundo Aventura */}
           <div className="flex flex-col items-center mb-3">
-            <span className="text-4xl md:text-5xl font-extrabold tracking-tight text-teal-800 font-serif">
-              Arenal
-            </span>
-            <span className="text-xs uppercase tracking-widest text-emerald-600 font-bold -mt-1">
-              Mundo Aventura
-            </span>
+            <img src="/logo.png" alt="Arenal Mundo Aventura" className="h-16 w-auto" />
           </div>
           <h2 className="text-xl font-bold text-slate-800">
             Control de Acceso / Tablet Login
