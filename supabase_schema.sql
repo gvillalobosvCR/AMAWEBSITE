@@ -231,3 +231,6 @@ INSERT INTO public.app_settings (key, value, updated_at) VALUES
 ('kiosk_pin', '{"value": "1234"}', NOW())
 ON CONFLICT (key) DO NOTHING;
 
+-- 13. Add email column to waivers
+ALTER TABLE public.waivers ADD COLUMN IF NOT EXISTS email TEXT;
+

@@ -11,6 +11,7 @@ interface PDFData {
   createdAt: string
   version: string
   signatureUrl: string
+  email?: string
   // Guardian details if minor
   isMinor: boolean
   guardianName?: string
@@ -107,6 +108,12 @@ export async function generateWaiverPDF(data: PDFData) {
   doc.text('Edad / Age:', margin + 100, currentY)
   doc.setFont('Helvetica', 'normal')
   doc.text(`${data.age} años / years old`, margin + 135, currentY)
+
+  currentY += 6
+  doc.setFont('Helvetica', 'bold')
+  doc.text('Correo / Email:', margin, currentY)
+  doc.setFont('Helvetica', 'normal')
+  doc.text(data.email || 'N/A', margin + 45, currentY)
 
   // 3. CONDITIONAL GUARDIAN METADATA
   if (data.isMinor) {

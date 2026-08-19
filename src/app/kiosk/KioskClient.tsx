@@ -38,6 +38,7 @@ export default function KioskClient({
   const [fullName, setFullName] = useState('')
   const [idPassport, setIdPassport] = useState('')
   const [age, setAge] = useState('')
+  const [email, setEmail] = useState('')
 
   // Agency States
   const [selectedAgencyId, setSelectedAgencyId] = useState<string>('')
@@ -68,6 +69,7 @@ export default function KioskClient({
     setFullName('')
     setIdPassport('')
     setAge('')
+    setEmail('')
     setGuardianName('')
     setGuardianId('')
     setRelationship('')
@@ -162,6 +164,7 @@ export default function KioskClient({
       exactContent: `${activeVersion.title_es} / ${activeVersion.title_en}\n\n${activeVersion.content_es}\n\n${activeVersion.content_en}`,
       isMinor,
       agencyId: selectedAgencyId || undefined,
+      email: email.trim() || undefined,
       guardianName: isMinor ? guardianName : undefined,
       guardianIdPassport: isMinor ? guardianId : undefined,
       relationship: isMinor ? relationship : undefined,
@@ -299,7 +302,7 @@ export default function KioskClient({
 
                   <div className="md:col-span-4 space-y-2">
                     <label className="text-sm font-bold text-slate-600 block">
-                      Identificación / Pasaporte / ID / Passport *
+                      Identificación / ID / Passport *
                     </label>
                     <input
                       type="text"
@@ -319,6 +322,20 @@ export default function KioskClient({
                       value={age}
                       onChange={(e) => setAge(e.target.value)}
                       placeholder="e.g. 25"
+                      className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 placeholder-slate-400 focus:bg-white focus:border-teal-600 focus:ring-4 focus:ring-teal-100 outline-none transition-all text-base md:text-lg"
+                    />
+                  </div>
+
+                  {/* Email Field (Optional) */}
+                  <div className="md:col-span-12 space-y-2">
+                    <label className="text-sm font-bold text-slate-600 block">
+                      Correo Electrónico / Email <span className="text-xs font-semibold text-slate-400 italic">(Opcional / Optional)</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="e.g. cliente@email.com / client@email.com"
                       className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 placeholder-slate-400 focus:bg-white focus:border-teal-600 focus:ring-4 focus:ring-teal-100 outline-none transition-all text-base md:text-lg"
                     />
                   </div>
@@ -356,7 +373,7 @@ export default function KioskClient({
 
                       <div className="md:col-span-4 space-y-2">
                         <label className="text-sm font-bold text-slate-600 block">
-                          Identificación / Pasaporte del tutor / Guardian ID / Passport *
+                          Identificación del tutor / Guardian ID / Passport *
                         </label>
                         <input
                           type="text"

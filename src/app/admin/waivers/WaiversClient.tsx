@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { getSignatureUrl } from '@/app/actions/waiver'
 import { generateWaiverPDF } from '@/lib/pdf-generator'
-import { Search, Eye, FileDown, X, ShieldAlert, Calendar, User, Baby, HelpCircle } from 'lucide-react'
+import { Search, Eye, FileDown, X, ShieldAlert, Calendar, User, Baby, HelpCircle, Mail } from 'lucide-react'
 import { formatDateTimeUTC } from '@/lib/date-utils'
 
 interface WaiverItem {
@@ -27,6 +27,7 @@ interface WaiverItem {
     guardian_signature_path: string
   } | null
   agencies?: { name: string } | null
+  email?: string | null
 }
 
 interface WaiversClientProps {
@@ -136,6 +137,7 @@ export default function WaiversClient({
           waiver_number,
           full_name,
           id_passport,
+          email,
           age,
           is_minor,
           language,
@@ -192,6 +194,7 @@ export default function WaiversClient({
         'Código de Waiver / Waiver Code',
         'Nombre Completo / Full Name',
         'Identificación / Passport ID',
+        'Correo Electrónico / Email',
         'Edad / Age',
         'Menor de Edad / Minor',
         'Idioma / Language',
@@ -207,6 +210,7 @@ export default function WaiversClient({
           w.waiver_number,
           `"${w.full_name?.replace(/"/g, '""') || ''}"`,
           `"${w.id_passport?.replace(/"/g, '""') || ''}"`,
+          w.email ? `"${w.email.replace(/"/g, '""')}"` : 'N/A',
           w.age,
           w.is_minor ? 'Sí / Yes' : 'No',
           w.language?.toUpperCase() || '',
@@ -256,6 +260,7 @@ export default function WaiversClient({
         language: w.language,
         exactContent: w.exact_content,
         createdAt: w.created_at,
+        email: w.email || undefined,
         version: w.guardian_information ? '1.0 (Minor)' : '1.0', // can adapt version field
         signatureUrl: signedSigUrl,
         isMinor: w.is_minor,
@@ -562,6 +567,12 @@ export default function WaiversClient({
                   )}
                   <div className="flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-slate-400 shrink-0" /><span>ID: <span className="font-semibold">{selectedWaiver.id_passport}</span></span></div>
                   <div className="flex items-center gap-2"><Baby className="w-4 h-4 text-slate-400 shrink-0" /><span>Edad: <span className="font-semibold">{selectedWaiver.age} años</span></span></div>
+                  {selectedWaiver.email && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span>Email: <span className="font-semibold text-slate-700">{selectedWaiver.email}</span></span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2 border-t md:border-t-0 md:border-l border-slate-200 pt-4 md:pt-0 md:pl-6">

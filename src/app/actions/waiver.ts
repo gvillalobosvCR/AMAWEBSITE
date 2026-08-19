@@ -13,6 +13,7 @@ interface SubmitWaiverParams {
   exactContent: string
   isMinor: boolean
   agencyId?: string
+  email?: string
   // Guardian parameters
   guardianName?: string
   guardianIdPassport?: string
@@ -80,6 +81,7 @@ export async function submitWaiver(params: SubmitWaiverParams) {
         tablet_user_id: user.id,
         is_minor: params.isMinor,
         agency_id: params.agencyId || null,
+        email: params.email || null,
       })
       .select('id')
       .single()
