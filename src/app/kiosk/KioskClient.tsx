@@ -78,8 +78,7 @@ export default function KioskClient({
     setSubmitting(false)
     setError(null)
     setWaiverNumber(null)
-    setSelectedAgencyId('')
-    setIsAgencyUnlocked(false)
+    // Preserve selectedAgencyId and isAgencyUnlocked status for group submissions
   }
 
   // Handle auto redirection on success
